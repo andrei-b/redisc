@@ -1,6 +1,7 @@
 #include "ChannelWindow.h"
 
 #include <QDateTime>
+#include <QPalette>
 #include <QHBoxLayout>
 #include <QLineEdit>
 #include <QPushButton>
@@ -55,4 +56,14 @@ void ChannelWindow::appendMessage(const QString &message)
 {
     const QString time = QDateTime::currentDateTime().toString("HH:mm:ss");
     m_messages->append(QString("[%1] %2").arg(time, message.toHtmlEscaped()));
+}
+
+void ChannelWindow::setMessageAppearance(const QFont &font, const QColor &color)
+{
+    m_messages->setFont(font);
+    QPalette palette = m_messages->palette();
+    palette.setColor(QPalette::Text, color);
+    palette.setColor(QPalette::WindowText, color);
+    m_messages->setPalette(palette);
+    m_messages->setStyleSheet(QString("QTextEdit { color: %1; }").arg(color.name()));
 }

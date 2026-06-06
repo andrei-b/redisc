@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QColor>
+#include <QFont>
 #include <QWidget>
 
 class QLineEdit;
@@ -14,6 +16,7 @@ public:
 
     QString channel() const;
     void appendMessage(const QString &message);
+    void setMessageAppearance(const QFont &font, const QColor &color);
 
 signals:
     void publishRequested(const QString &channel, const QString &message);

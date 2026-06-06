@@ -4,15 +4,20 @@
 #include "RedisConnection.h"
 #include "SshTunnel.h"
 
+#include <QColor>
+#include <QFont>
 #include <QHash>
 #include <QMainWindow>
+#include <QStringList>
 
 class QCheckBox;
 class QCloseEvent;
 class QComboBox;
+class QLabel;
 class QLineEdit;
 class QListWidget;
 class QMdiArea;
+class QPushButton;
 class QSpinBox;
 class QStatusBar;
 
@@ -50,6 +55,12 @@ private:
     void deleteCurrentConnectionProfile();
     void resetConnectionFields();
     QString currentConnectionName() const;
+    void rememberChannel(const QString &channel);
+    void updateChannelList();
+    void chooseChannelFont();
+    void chooseChannelTextColor();
+    void applyChannelAppearance();
+    void updateChannelAppearanceControls();
 
     RedisConnection m_redis;
     SshTunnel m_tunnel;
@@ -58,6 +69,9 @@ private:
     QLineEdit *m_connectionName = nullptr;
     QListWidget *m_channelList = nullptr;
     QLineEdit *m_manualChannel = nullptr;
+    QPushButton *m_channelFontButton = nullptr;
+    QPushButton *m_channelTextColorButton = nullptr;
+    QLabel *m_channelTextColorPreview = nullptr;
     QComboBox *m_theme = nullptr;
     QLineEdit *m_host = nullptr;
     QSpinBox *m_port = nullptr;
@@ -70,5 +84,9 @@ private:
     QLineEdit *m_sshUser = nullptr;
     QLineEdit *m_identityFile = nullptr;
     QSpinBox *m_localPort = nullptr;
+    QStringList m_liveChannels;
+    QStringList m_recentChannels;
+    QFont m_channelFont;
+    QColor m_channelTextColor = QColor("#202124");
     QHash<QString, ChannelWindow *> m_windows;
 };

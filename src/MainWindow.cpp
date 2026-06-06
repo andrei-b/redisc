@@ -2,10 +2,13 @@
 
 #include <QApplication>
 #include <QCheckBox>
+#include <QColorDialog>
 #include <QComboBox>
 #include <QDockWidget>
 #include <QFileDialog>
+#include <QFontDialog>
 #include <QFormLayout>
+#include <QFrame>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -180,24 +183,43 @@ QWidget *MainWindow::buildChannelPanel()
     m_manualChannel = new QLineEdit(panel);
     m_manualChannel->setPlaceholderText("Channel name");
     auto *subscribe = new QPushButton("Open channel", panel);
+    auto *appearanceBox = new QGroupBox("Channel window text", panel);
+    auto *appearanceLayout = new QFormLayout(appearanceBox);
+    m_channelFontButton = new QPushButton("Font", appearanceBox);
+    m_channelTextColorButton = new QPushButton("Color", appearanceBox);
+    m_channelTextColorPreview = new QLabel(appearanceBox);
+    m_channelTextColorPreview->setFixedSize(42, 22);
+    m_channelTextColorPreview->setFrameShape(QFrame::Panel);
+    m_channelTextColorPreview->setAutoFillBackground(true);
+    auto *colorRow = new QWidget(appearanceBox);
+    auto *colorLayout = new QHBoxLayout(colorRow);
+    colorLayout->setContentsMargins(0, 0, 0, 0);
+    colorLayout->addWidget(m_channelTextColorButton);
+    colorLayout->addWidget(m_channelTextColorPreview);
+    colorLayout->addStretch(1);
+    appearanceLayout->addRow("Font", m_channelFontButton);
+    appearanceLayout->addRow("Text color", colorRow);
 
     layout->addWidget(refresh);
     layout->addWidget(m_channelList, 1);
     layout->addWidget(m_manualChannel);
     layout->addWidget(subscribe);
+    layout->addWidget(appearanceBox);
 
     connect(refresh, &QPushButton::clicked, &m_redis, &RedisConnection::refreshChannels);
     connect(m_channelList, &QListWidget::itemDoubleClicked, this, [this](QListWidgetItem *item) {
-        openChannel(item->text());
+        openChannel(item->data(Qt::UserRole).toString());
     });
     connect(subscribe, &QPushButton::clicked, this, [this]() {
         QString channel = m_manualChannel->text().trimmed();
         if (channel.isEmpty() && m_channelList->currentItem()) {
-            channel = m_channelList->currentItem()->text();
+            channel = m_channelList->currentItem()->data(Qt::UserRole).toString();
         }
         openChannel(channel);
     });
     connect(m_manualChannel, &QLineEdit::returnPressed, subscribe, &QPushButton::click);
+    connect(m_channelFontButton, &QPushButton::clicked, this, &MainWindow::chooseChannelFont);
+    connect(m_channelTextColorButton, &QPushButton::clicked, this, &MainWindow::chooseChannelTextColor);
 
     return panel;
 }
@@ -239,10 +261,8 @@ void MainWindow::onConnected()
 
 void MainWindow::onChannelsReceived(const QStringList &channels)
 {
-    m_channelList->clear();
-    for (const QString &channel : channels) {
-        m_channelList->addItem(channel);
-    }
+    m_liveChannels = channels;
+    updateChannelList();
 }
 
 void MainWindow::openChannel(const QString &channel)
@@ -251,6 +271,7 @@ void MainWindow::openChannel(const QString &channel)
     if (trimmed.isEmpty()) {
         return;
     }
+    rememberChannel(trimmed);
     if (m_windows.contains(trimmed)) {
         m_mdi->setActiveSubWindow(qobject_cast<QMdiSubWindow *>(m_windows.value(trimmed)->parentWidget()));
         return;
@@ -264,6 +285,7 @@ void MainWindow::onSubscribed(const QString &channel)
         return;
     }
     auto *window = new ChannelWindow(channel);
+    window->setMessageAppearance(m_channelFont, m_channelTextColor);
     auto *subWindow = m_mdi->addSubWindow(window);
     subWindow->setWindowTitle(channel);
     subWindow->resize(520, 360);
@@ -368,6 +390,19 @@ void MainWindow::loadSettings()
 {
     QSettings settings;
 
+    m_recentChannels = settings.value("channels/recent").toStringList();
+    m_channelFont = QApplication::font();
+    const QString fontValue = settings.value("channels/font").toString();
+    if (!fontValue.isEmpty()) {
+        m_channelFont.fromString(fontValue);
+    }
+    m_channelTextColor = QColor(settings.value("channels/textColor", "#202124").toString());
+    if (!m_channelTextColor.isValid()) {
+        m_channelTextColor = QColor("#202124");
+    }
+    updateChannelList();
+    updateChannelAppearanceControls();
+
     loadConnectionProfiles();
 
     const QString theme = settings.value("ui/theme", "System").toString();
@@ -388,6 +423,9 @@ void MainWindow::saveSettings() const
     QSettings settings;
 
     settings.setValue("connections/last", currentConnectionName());
+    settings.setValue("channels/recent", m_recentChannels);
+    settings.setValue("channels/font", m_channelFont.toString());
+    settings.setValue("channels/textColor", m_channelTextColor.name());
     settings.setValue("ui/theme", m_theme->currentText());
     settings.setValue("ui/geometry", saveGeometry());
 }
@@ -574,4 +612,92 @@ void MainWindow::resetConnectionFields()
 QString MainWindow::currentConnectionName() const
 {
     return m_connectionName->text().trimmed();
+}
+
+void MainWindow::rememberChannel(const QString &channel)
+{
+    const QString trimmed = channel.trimmed();
+    if (trimmed.isEmpty()) {
+        return;
+    }
+
+    m_recentChannels.removeAll(trimmed);
+    m_recentChannels.prepend(trimmed);
+    while (m_recentChannels.size() > 100) {
+        m_recentChannels.removeLast();
+    }
+    updateChannelList();
+    saveSettings();
+}
+
+void MainWindow::updateChannelList()
+{
+    if (!m_channelList) {
+        return;
+    }
+
+    m_channelList->clear();
+    QStringList added;
+    auto addChannel = [this, &added](const QString &channel, const QString &suffix) {
+        const QString trimmed = channel.trimmed();
+        if (trimmed.isEmpty() || added.contains(trimmed)) {
+            return;
+        }
+        auto *item = new QListWidgetItem(suffix.isEmpty() ? trimmed : QString("%1 %2").arg(trimmed, suffix));
+        item->setData(Qt::UserRole, trimmed);
+        m_channelList->addItem(item);
+        added.append(trimmed);
+    };
+
+    for (const QString &channel : m_recentChannels) {
+        addChannel(channel, "(recent)");
+    }
+    for (const QString &channel : m_liveChannels) {
+        addChannel(channel, QString());
+    }
+}
+
+void MainWindow::chooseChannelFont()
+{
+    bool ok = false;
+    const QFont font = QFontDialog::getFont(&ok, m_channelFont, this, "Channel window font");
+    if (!ok) {
+        return;
+    }
+    m_channelFont = font;
+    updateChannelAppearanceControls();
+    applyChannelAppearance();
+    saveSettings();
+}
+
+void MainWindow::chooseChannelTextColor()
+{
+    const QColor color = QColorDialog::getColor(m_channelTextColor, this, "Channel window text color");
+    if (!color.isValid()) {
+        return;
+    }
+    m_channelTextColor = color;
+    updateChannelAppearanceControls();
+    applyChannelAppearance();
+    saveSettings();
+}
+
+void MainWindow::applyChannelAppearance()
+{
+    for (ChannelWindow *window : std::as_const(m_windows)) {
+        window->setMessageAppearance(m_channelFont, m_channelTextColor);
+    }
+}
+
+void MainWindow::updateChannelAppearanceControls()
+{
+    if (m_channelFontButton) {
+        m_channelFontButton->setText(QString("%1 %2").arg(m_channelFont.family()).arg(m_channelFont.pointSize()));
+    }
+    if (m_channelTextColorPreview) {
+        QPalette palette = m_channelTextColorPreview->palette();
+        palette.setColor(QPalette::Window, m_channelTextColor);
+        m_channelTextColorPreview->setPalette(palette);
+        m_channelTextColorPreview->setToolTip(m_channelTextColor.name());
+    }
 }
