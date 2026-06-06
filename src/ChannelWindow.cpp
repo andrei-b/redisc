@@ -2,6 +2,7 @@
 
 #include <QDateTime>
 #include <QPalette>
+#include <QTextCursor>
 #include <QHBoxLayout>
 #include <QLineEdit>
 #include <QPushButton>
@@ -55,7 +56,9 @@ QString ChannelWindow::channel() const
 void ChannelWindow::appendMessage(const QString &message)
 {
     const QString time = QDateTime::currentDateTime().toString("HH:mm:ss");
-    m_messages->append(QString("[%1] %2").arg(time, message.toHtmlEscaped()));
+    m_messages->moveCursor(QTextCursor::End);
+    m_messages->insertPlainText(QString("[%1] %2\n").arg(time, message));
+    m_messages->moveCursor(QTextCursor::End);
 }
 
 void ChannelWindow::setMessageAppearance(const QFont &font, const QColor &color)
