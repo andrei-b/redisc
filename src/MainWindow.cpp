@@ -66,6 +66,16 @@ MainWindow::MainWindow(QWidget *parent)
     connect(&m_tunnel, &SshTunnel::errorOccurred, this, [this](const QString &message) {
         QMessageBox::warning(this, "SSH tunnel error", message);
     });
+    connect(&m_python, &PythonClient::publishRequested, &m_redis, &RedisConnection::publish);
+    connect(&m_python, &PythonClient::subscribeRequested, this, &MainWindow::openChannel);
+    connect(&m_python, &PythonClient::unsubscribeRequested, &m_redis, &RedisConnection::unsubscribe);
+    connect(&m_python, &PythonClient::logMessage, this, [this](const QString &message) {
+        statusBar()->showMessage(message);
+    });
+    connect(&m_python, &PythonClient::errorOccurred, this, [this](const QString &message) {
+        statusBar()->showMessage(message);
+        QMessageBox::warning(this, "Python", message);
+    });
 
     loadSettings();
     applyTheme(m_theme->currentText());
@@ -136,6 +146,27 @@ QWidget *MainWindow::buildConnectionPanel()
     sshForm->addRow("Identity", identityRow);
     sshForm->addRow("Local port", m_localPort);
 
+    auto *pythonBox = new QGroupBox("Python client", panel);
+    auto *pythonForm = new QFormLayout(pythonBox);
+    m_pythonEnabled = new QCheckBox("Notify Python on Redis messages", pythonBox);
+    m_pythonScript = new QLineEdit(pythonBox);
+    auto *scriptRow = new QWidget(pythonBox);
+    auto *scriptLayout = new QHBoxLayout(scriptRow);
+    scriptLayout->setContentsMargins(0, 0, 0, 0);
+    auto *browseScript = new QToolButton(scriptRow);
+    browseScript->setText("...");
+    browseScript->setToolTip("Choose Python script");
+    scriptLayout->addWidget(m_pythonScript, 1);
+    scriptLayout->addWidget(browseScript);
+    auto *pythonButtons = new QHBoxLayout;
+    auto *loadScript = new QPushButton("Load", pythonBox);
+    auto *unloadScript = new QPushButton("Unload", pythonBox);
+    pythonButtons->addWidget(loadScript);
+    pythonButtons->addWidget(unloadScript);
+    pythonForm->addRow(m_pythonEnabled);
+    pythonForm->addRow("Script", scriptRow);
+    pythonForm->addRow(pythonButtons);
+
     auto *buttons = new QHBoxLayout;
     auto *connectButton = new QPushButton("Connect", panel);
     auto *disconnectButton = new QPushButton("Disconnect", panel);
@@ -148,6 +179,7 @@ QWidget *MainWindow::buildConnectionPanel()
     layout->addWidget(profilesBox);
     layout->addWidget(redisBox);
     layout->addWidget(sshBox);
+    layout->addWidget(pythonBox);
     layout->addLayout(buttons);
     layout->addWidget(new QLabel("Color scheme", panel));
     layout->addWidget(m_theme);
@@ -168,6 +200,17 @@ QWidget *MainWindow::buildConnectionPanel()
         if (!file.isEmpty()) {
             m_identityFile->setText(file);
         }
+    });
+    connect(browseScript, &QToolButton::clicked, this, [this]() {
+        const QString file = QFileDialog::getOpenFileName(this, "Python script", QString(), "Python files (*.py);;All files (*)");
+        if (!file.isEmpty()) {
+            m_pythonScript->setText(file);
+        }
+    });
+    connect(loadScript, &QPushButton::clicked, this, &MainWindow::loadPythonScript);
+    connect(unloadScript, &QPushButton::clicked, this, [this]() {
+        m_python.clear();
+        statusBar()->showMessage("Unloaded Python script");
     });
     connect(m_theme, &QComboBox::currentTextChanged, this, &MainWindow::applyTheme);
 
@@ -313,6 +356,9 @@ void MainWindow::onMessage(const QString &channel, const QString &message)
         onSubscribed(channel);
     }
     m_windows.value(channel)->appendMessage(message);
+    if (m_pythonEnabled->isChecked()) {
+        m_python.notifyRedisMessage(channel, message);
+    }
 }
 
 RedisConfig MainWindow::redisConfig() const
@@ -392,6 +438,8 @@ void MainWindow::loadSettings()
     QSettings settings;
 
     m_recentChannels = settings.value("channels/recent").toStringList();
+    m_pythonEnabled->setChecked(settings.value("python/enabled", false).toBool());
+    m_pythonScript->setText(settings.value("python/script").toString());
     m_channelFont = QApplication::font();
     const QString fontValue = settings.value("channels/font").toString();
     if (!fontValue.isEmpty()) {
@@ -425,6 +473,8 @@ void MainWindow::saveSettings() const
 
     settings.setValue("connections/last", currentConnectionName());
     settings.setValue("channels/recent", m_recentChannels);
+    settings.setValue("python/enabled", m_pythonEnabled->isChecked());
+    settings.setValue("python/script", m_pythonScript->text().trimmed());
     settings.setValue("channels/font", m_channelFont.toString());
     settings.setValue("channels/textColor", m_channelTextColor.name());
     settings.setValue("ui/theme", m_theme->currentText());
@@ -712,4 +762,12 @@ void MainWindow::openJsonViewer(const QString &channel, const QString &jsonText)
     subWindow->resize(620, 520);
     viewer->show();
     m_mdi->setActiveSubWindow(subWindow);
+}
+
+void MainWindow::loadPythonScript()
+{
+    if (m_python.loadScript(m_pythonScript->text())) {
+        m_pythonEnabled->setChecked(true);
+        saveSettings();
+    }
 }

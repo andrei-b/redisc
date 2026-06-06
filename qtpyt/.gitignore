@@ -1,0 +1,64 @@
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Linker files
+*.ilk
+
+# Debugger Files
+*.pdb
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# debug information files
+*.dwo
+
+# CMake build directories
+build/
+cmake-build-*/
+
+_codeql_build_dir/
+build/
+docs/html
+html/*
+docs/latex
+latex/*
+# IDE specific
+.vscode/
+.idea/
+*.swp
+*~
+
+# Doxygen generated documentation
+/docs/html/
+/docs/latex/
+/docs/xml/
+/docs/man/
+/docs/rtf/

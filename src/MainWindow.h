@@ -2,6 +2,7 @@
 
 #include "ChannelWindow.h"
 #include "JsonTreeWindow.h"
+#include "PythonClient.h"
 #include "RedisConnection.h"
 #include "SshTunnel.h"
 
@@ -63,9 +64,11 @@ private:
     void applyChannelAppearance();
     void updateChannelAppearanceControls();
     void openJsonViewer(const QString &channel, const QString &jsonText);
+    void loadPythonScript();
 
     RedisConnection m_redis;
     SshTunnel m_tunnel;
+    PythonClient m_python;
     QMdiArea *m_mdi = nullptr;
     QListWidget *m_connectionList = nullptr;
     QLineEdit *m_connectionName = nullptr;
@@ -86,6 +89,8 @@ private:
     QLineEdit *m_sshUser = nullptr;
     QLineEdit *m_identityFile = nullptr;
     QSpinBox *m_localPort = nullptr;
+    QCheckBox *m_pythonEnabled = nullptr;
+    QLineEdit *m_pythonScript = nullptr;
     QStringList m_liveChannels;
     QStringList m_recentChannels;
     QFont m_channelFont;
