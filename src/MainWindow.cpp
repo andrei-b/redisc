@@ -15,6 +15,8 @@
 #include <QMdiSubWindow>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QSettings>
+#include <QSignalBlocker>
 #include <QSpinBox>
 #include <QStatusBar>
 #include <QTabWidget>
@@ -62,13 +64,30 @@ MainWindow::MainWindow(QWidget *parent)
         QMessageBox::warning(this, "SSH tunnel error", message);
     });
 
-    applyTheme("System");
+    loadSettings();
+    applyTheme(m_theme->currentText());
 }
 
 QWidget *MainWindow::buildConnectionPanel()
 {
     auto *panel = new QWidget(this);
     auto *layout = new QVBoxLayout(panel);
+
+    auto *profilesBox = new QGroupBox("Connections", panel);
+    auto *profilesLayout = new QVBoxLayout(profilesBox);
+    m_connectionList = new QListWidget(profilesBox);
+    m_connectionName = new QLineEdit(profilesBox);
+    m_connectionName->setPlaceholderText("Connection name");
+    auto *profileButtons = new QHBoxLayout;
+    auto *newProfile = new QPushButton("New", profilesBox);
+    auto *saveProfile = new QPushButton("Save", profilesBox);
+    auto *deleteProfile = new QPushButton("Delete", profilesBox);
+    profileButtons->addWidget(newProfile);
+    profileButtons->addWidget(saveProfile);
+    profileButtons->addWidget(deleteProfile);
+    profilesLayout->addWidget(m_connectionList);
+    profilesLayout->addWidget(m_connectionName);
+    profilesLayout->addLayout(profileButtons);
 
     auto *redisBox = new QGroupBox("Redis", panel);
     auto *redisForm = new QFormLayout(redisBox);
@@ -123,6 +142,7 @@ QWidget *MainWindow::buildConnectionPanel()
     m_theme = new QComboBox(panel);
     m_theme->addItems({"System", "Light", "Dark", "Solarized"});
 
+    layout->addWidget(profilesBox);
     layout->addWidget(redisBox);
     layout->addWidget(sshBox);
     layout->addLayout(buttons);
@@ -132,6 +152,14 @@ QWidget *MainWindow::buildConnectionPanel()
 
     connect(connectButton, &QPushButton::clicked, this, &MainWindow::connectClicked);
     connect(disconnectButton, &QPushButton::clicked, this, &MainWindow::disconnectClicked);
+    connect(newProfile, &QPushButton::clicked, this, [this]() {
+        m_connectionList->clearSelection();
+        resetConnectionFields();
+        m_connectionName->setFocus();
+    });
+    connect(saveProfile, &QPushButton::clicked, this, &MainWindow::saveCurrentConnectionProfile);
+    connect(deleteProfile, &QPushButton::clicked, this, &MainWindow::deleteCurrentConnectionProfile);
+    connect(m_connectionList, &QListWidget::currentTextChanged, this, &MainWindow::loadConnectionProfile);
     connect(browseIdentity, &QToolButton::clicked, this, [this]() {
         const QString file = QFileDialog::getOpenFileName(this, "Identity file");
         if (!file.isEmpty()) {
@@ -184,6 +212,10 @@ void MainWindow::connectClicked()
         QMessageBox::warning(this, "Missing SSH host", "Enter an SSH host before connecting over a tunnel.");
         return;
     }
+    if (!currentConnectionName().isEmpty()) {
+        saveCurrentConnectionProfile();
+    }
+    saveSettings();
     statusBar()->showMessage("Connecting...");
     if (m_useSsh->isChecked()) {
         m_tunnel.start(tunnelConfig());
@@ -323,4 +355,223 @@ void MainWindow::applyTheme(const QString &theme)
         )";
     }
     qApp->setStyleSheet(sheet);
+    saveSettings();
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    saveSettings();
+    QMainWindow::closeEvent(event);
+}
+
+void MainWindow::loadSettings()
+{
+    QSettings settings;
+
+    loadConnectionProfiles();
+
+    const QString theme = settings.value("ui/theme", "System").toString();
+    const int themeIndex = m_theme->findText(theme);
+    {
+        const QSignalBlocker blocker(m_theme);
+        m_theme->setCurrentIndex(themeIndex >= 0 ? themeIndex : 0);
+    }
+
+    const QByteArray geometry = settings.value("ui/geometry").toByteArray();
+    if (!geometry.isEmpty()) {
+        restoreGeometry(geometry);
+    }
+}
+
+void MainWindow::saveSettings() const
+{
+    QSettings settings;
+
+    settings.setValue("connections/last", currentConnectionName());
+    settings.setValue("ui/theme", m_theme->currentText());
+    settings.setValue("ui/geometry", saveGeometry());
+}
+
+void MainWindow::loadConnectionProfiles()
+{
+    QSettings settings;
+    QStringList names = settings.value("connections/names").toStringList();
+
+    if (names.isEmpty() && settings.contains("redis/host")) {
+        const QVariant redisHost = settings.value("redis/host", "127.0.0.1");
+        const QVariant redisPort = settings.value("redis/port", 6379);
+        const QVariant redisUsername = settings.value("redis/username");
+        const QVariant redisPassword = settings.value("redis/password");
+        const QVariant redisDatabase = settings.value("redis/database", 0);
+        const QVariant sshEnabled = settings.value("ssh/enabled", false);
+        const QVariant sshHost = settings.value("ssh/host");
+        const QVariant sshPort = settings.value("ssh/port", 22);
+        const QVariant sshUser = settings.value("ssh/user");
+        const QVariant sshIdentityFile = settings.value("ssh/identityFile");
+        const QVariant sshLocalPort = settings.value("ssh/localPort", 16379);
+
+        names << "Default";
+        settings.setValue("connections/names", names);
+        settings.beginGroup("connections/profiles/Default");
+        settings.setValue("redisHost", redisHost);
+        settings.setValue("redisPort", redisPort);
+        settings.setValue("redisUsername", redisUsername);
+        settings.setValue("redisPassword", redisPassword);
+        settings.setValue("redisDatabase", redisDatabase);
+        settings.setValue("sshEnabled", sshEnabled);
+        settings.setValue("sshHost", sshHost);
+        settings.setValue("sshPort", sshPort);
+        settings.setValue("sshUser", sshUser);
+        settings.setValue("sshIdentityFile", sshIdentityFile);
+        settings.setValue("sshLocalPort", sshLocalPort);
+        settings.endGroup();
+    }
+
+    {
+        const QSignalBlocker blocker(m_connectionList);
+        m_connectionList->clear();
+        for (const QString &name : names) {
+            m_connectionList->addItem(name);
+        }
+    }
+
+    const QString last = settings.value("connections/last").toString();
+    const QList<QListWidgetItem *> matches = m_connectionList->findItems(last, Qt::MatchExactly);
+    if (!matches.isEmpty()) {
+        m_connectionList->setCurrentItem(matches.first());
+        loadConnectionProfile(last);
+    } else if (m_connectionList->count() > 0) {
+        m_connectionList->setCurrentRow(0);
+        loadConnectionProfile(m_connectionList->currentItem()->text());
+    } else {
+        resetConnectionFields();
+    }
+}
+
+void MainWindow::loadConnectionProfile(const QString &name)
+{
+    if (name.isEmpty()) {
+        return;
+    }
+
+    QSettings settings;
+    settings.beginGroup("connections/profiles/" + name);
+    m_connectionName->setText(name);
+    m_host->setText(settings.value("redisHost", "127.0.0.1").toString());
+    m_port->setValue(settings.value("redisPort", 6379).toInt());
+    m_username->setText(settings.value("redisUsername").toString());
+    m_password->setText(settings.value("redisPassword").toString());
+    m_database->setValue(settings.value("redisDatabase", 0).toInt());
+    m_useSsh->setChecked(settings.value("sshEnabled", false).toBool());
+    m_sshHost->setText(settings.value("sshHost").toString());
+    m_sshPort->setValue(settings.value("sshPort", 22).toInt());
+    m_sshUser->setText(settings.value("sshUser").toString());
+    m_identityFile->setText(settings.value("sshIdentityFile").toString());
+    m_localPort->setValue(settings.value("sshLocalPort", 16379).toInt());
+    settings.endGroup();
+}
+
+void MainWindow::saveCurrentConnectionProfile()
+{
+    const QString name = currentConnectionName();
+    if (name.isEmpty()) {
+        QMessageBox::warning(this, "Missing connection name", "Enter a connection name before saving.");
+        return;
+    }
+    if (name.contains('/') || name.contains('\\')) {
+        QMessageBox::warning(this, "Invalid connection name", "Connection names cannot contain slashes.");
+        return;
+    }
+
+    QSettings settings;
+    QStringList names = settings.value("connections/names").toStringList();
+    const QString previousName = m_connectionList->currentItem() ? m_connectionList->currentItem()->text() : QString();
+    if (!previousName.isEmpty() && previousName != name) {
+        settings.remove("connections/profiles/" + previousName);
+        const int oldIndex = names.indexOf(previousName);
+        if (oldIndex >= 0) {
+            names[oldIndex] = name;
+        }
+    }
+    if (!names.contains(name)) {
+        names.append(name);
+    }
+
+    settings.setValue("connections/names", names);
+    settings.setValue("connections/last", name);
+    settings.beginGroup("connections/profiles/" + name);
+    settings.setValue("redisHost", m_host->text().trimmed());
+    settings.setValue("redisPort", m_port->value());
+    settings.setValue("redisUsername", m_username->text().trimmed());
+    settings.setValue("redisPassword", m_password->text());
+    settings.setValue("redisDatabase", m_database->value());
+    settings.setValue("sshEnabled", m_useSsh->isChecked());
+    settings.setValue("sshHost", m_sshHost->text().trimmed());
+    settings.setValue("sshPort", m_sshPort->value());
+    settings.setValue("sshUser", m_sshUser->text().trimmed());
+    settings.setValue("sshIdentityFile", m_identityFile->text().trimmed());
+    settings.setValue("sshLocalPort", m_localPort->value());
+    settings.endGroup();
+
+    {
+        const QSignalBlocker blocker(m_connectionList);
+        m_connectionList->clear();
+        for (const QString &profileName : names) {
+            m_connectionList->addItem(profileName);
+        }
+    }
+    const QList<QListWidgetItem *> matches = m_connectionList->findItems(name, Qt::MatchExactly);
+    if (!matches.isEmpty()) {
+        m_connectionList->setCurrentItem(matches.first());
+    }
+    statusBar()->showMessage(QString("Saved connection '%1'").arg(name));
+}
+
+void MainWindow::deleteCurrentConnectionProfile()
+{
+    const QString name = m_connectionList->currentItem() ? m_connectionList->currentItem()->text() : QString();
+    if (name.isEmpty()) {
+        return;
+    }
+
+    const QMessageBox::StandardButton choice = QMessageBox::question(
+        this,
+        "Delete connection",
+        QString("Delete connection '%1'?").arg(name));
+    if (choice != QMessageBox::Yes) {
+        return;
+    }
+
+    QSettings settings;
+    QStringList names = settings.value("connections/names").toStringList();
+    names.removeAll(name);
+    settings.setValue("connections/names", names);
+    settings.remove("connections/profiles/" + name);
+    if (settings.value("connections/last").toString() == name) {
+        settings.remove("connections/last");
+    }
+
+    loadConnectionProfiles();
+    statusBar()->showMessage(QString("Deleted connection '%1'").arg(name));
+}
+
+void MainWindow::resetConnectionFields()
+{
+    m_connectionName->clear();
+    m_host->setText("127.0.0.1");
+    m_port->setValue(6379);
+    m_username->clear();
+    m_password->clear();
+    m_database->setValue(0);
+    m_useSsh->setChecked(false);
+    m_sshHost->clear();
+    m_sshPort->setValue(22);
+    m_sshUser->clear();
+    m_identityFile->clear();
+    m_localPort->setValue(16379);
+}
+
+QString MainWindow::currentConnectionName() const
+{
+    return m_connectionName->text().trimmed();
 }

@@ -8,6 +8,7 @@
 #include <QMainWindow>
 
 class QCheckBox;
+class QCloseEvent;
 class QComboBox;
 class QLineEdit;
 class QListWidget;
@@ -20,6 +21,9 @@ class MainWindow : public QMainWindow {
 
 public:
     explicit MainWindow(QWidget *parent = nullptr);
+
+protected:
+    void closeEvent(QCloseEvent *event) override;
 
 private slots:
     void connectClicked();
@@ -38,10 +42,20 @@ private:
     RedisConfig redisConfig() const;
     SshTunnelConfig tunnelConfig() const;
     void setUiConnected(bool connected);
+    void loadSettings();
+    void saveSettings() const;
+    void loadConnectionProfiles();
+    void loadConnectionProfile(const QString &name);
+    void saveCurrentConnectionProfile();
+    void deleteCurrentConnectionProfile();
+    void resetConnectionFields();
+    QString currentConnectionName() const;
 
     RedisConnection m_redis;
     SshTunnel m_tunnel;
     QMdiArea *m_mdi = nullptr;
+    QListWidget *m_connectionList = nullptr;
+    QLineEdit *m_connectionName = nullptr;
     QListWidget *m_channelList = nullptr;
     QLineEdit *m_manualChannel = nullptr;
     QComboBox *m_theme = nullptr;
