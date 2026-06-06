@@ -1,6 +1,8 @@
 #include "ChannelWindow.h"
 
 #include <QDateTime>
+#include <QJsonDocument>
+#include <QJsonParseError>
 #include <QPalette>
 #include <QTextCursor>
 #include <QHBoxLayout>
@@ -24,12 +26,16 @@ ChannelWindow::ChannelWindow(const QString &channel, QWidget *parent)
     m_input = new QLineEdit(this);
     m_input->setPlaceholderText("Message");
     m_send = new QPushButton("Publish", this);
+    m_openJson = new QPushButton("JSON", this);
+    m_openJson->setEnabled(false);
+    m_openJson->setToolTip("Open latest JSON message as a tree");
     auto *unsubscribe = new QToolButton(this);
     unsubscribe->setText("x");
     unsubscribe->setToolTip("Unsubscribe");
 
     row->addWidget(m_input, 1);
     row->addWidget(m_send);
+    row->addWidget(m_openJson);
     row->addWidget(unsubscribe);
 
     layout->addWidget(m_messages, 1);
@@ -46,6 +52,11 @@ ChannelWindow::ChannelWindow(const QString &channel, QWidget *parent)
     connect(unsubscribe, &QToolButton::clicked, this, [this]() {
         emit unsubscribeRequested(m_channel);
     });
+    connect(m_openJson, &QPushButton::clicked, this, [this]() {
+        if (!m_lastJsonMessage.isEmpty()) {
+            emit jsonViewRequested(m_channel, m_lastJsonMessage);
+        }
+    });
 }
 
 QString ChannelWindow::channel() const
@@ -59,6 +70,12 @@ void ChannelWindow::appendMessage(const QString &message)
     m_messages->moveCursor(QTextCursor::End);
     m_messages->insertPlainText(QString("[%1] %2\n").arg(time, message));
     m_messages->moveCursor(QTextCursor::End);
+
+    QJsonParseError error;
+    const QJsonDocument document = QJsonDocument::fromJson(message.trimmed().toUtf8(), &error);
+    const bool isJson = error.error == QJsonParseError::NoError && !document.isNull();
+    m_lastJsonMessage = isJson ? message.trimmed() : QString();
+    m_openJson->setEnabled(isJson);
 }
 
 void ChannelWindow::setMessageAppearance(const QFont &font, const QColor &color)

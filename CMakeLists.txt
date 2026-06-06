@@ -13,6 +13,8 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets Network)
 qt_add_executable(redisc
     src/ChannelWindow.cpp
     src/ChannelWindow.h
+    src/JsonTreeWindow.cpp
+    src/JsonTreeWindow.h
     src/MainWindow.cpp
     src/MainWindow.h
     src/RedisConnection.cpp

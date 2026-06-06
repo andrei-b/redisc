@@ -294,6 +294,7 @@ void MainWindow::onSubscribed(const QString &channel)
 
     connect(window, &ChannelWindow::publishRequested, &m_redis, &RedisConnection::publish);
     connect(window, &ChannelWindow::unsubscribeRequested, &m_redis, &RedisConnection::unsubscribe);
+    connect(window, &ChannelWindow::jsonViewRequested, this, &MainWindow::openJsonViewer);
     connect(subWindow, &QMdiSubWindow::destroyed, this, [this, channel]() {
         m_windows.remove(channel);
     });
@@ -700,4 +701,15 @@ void MainWindow::updateChannelAppearanceControls()
         m_channelTextColorPreview->setPalette(palette);
         m_channelTextColorPreview->setToolTip(m_channelTextColor.name());
     }
+}
+
+void MainWindow::openJsonViewer(const QString &channel, const QString &jsonText)
+{
+    auto *viewer = new JsonTreeWindow(channel, jsonText);
+    auto *subWindow = m_mdi->addSubWindow(viewer);
+    ++m_jsonWindowCount;
+    subWindow->setWindowTitle(QString("%1 JSON %2").arg(channel).arg(m_jsonWindowCount));
+    subWindow->resize(620, 520);
+    viewer->show();
+    m_mdi->setActiveSubWindow(subWindow);
 }

@@ -9,6 +9,7 @@ Redisc is a small Qt 6 Redis pub/sub client.
 - Redis `PUBSUB CHANNELS` browser.
 - Persistent recent channel list, merged with live Redis channel results.
 - Per-channel MDI windows for subscribed channels.
+- JSON messages can be copied into separate collapsible tree windows.
 - Configurable persistent font and text color for channel windows.
 - Publish messages from each channel window.
 - System, light, dark, and solarized color schemes.

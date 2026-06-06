@@ -21,10 +21,13 @@ public:
 signals:
     void publishRequested(const QString &channel, const QString &message);
     void unsubscribeRequested(const QString &channel);
+    void jsonViewRequested(const QString &channel, const QString &jsonText);
 
 private:
     QString m_channel;
+    QString m_lastJsonMessage;
     QTextEdit *m_messages = nullptr;
     QLineEdit *m_input = nullptr;
     QPushButton *m_send = nullptr;
+    QPushButton *m_openJson = nullptr;
 };
