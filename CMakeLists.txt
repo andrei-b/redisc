@@ -9,7 +9,7 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
 include(CMakePackageConfigHelpers)
-find_package(Qt6 REQUIRED COMPONENTS Widgets Network Gui)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Network Gui Test)
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development.Embed)
 find_package(pybind11 CONFIG REQUIRED)
 
@@ -44,3 +44,19 @@ qt_add_executable(redisc
 
 target_include_directories(redisc PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/qtpyt/include")
 target_link_libraries(redisc PRIVATE Qt6::Widgets Qt6::Network qtpyt)
+
+enable_testing()
+
+qt_add_executable(redisc_python_api_tests
+    tests/PythonClientTest.cpp
+    src/PythonClient.cpp
+    src/PythonClient.h
+)
+
+target_include_directories(redisc_python_api_tests PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/qtpyt/include"
+)
+target_link_libraries(redisc_python_api_tests PRIVATE Qt6::Test Qt6::Core qtpyt)
+
+add_test(NAME python_api COMMAND redisc_python_api_tests)

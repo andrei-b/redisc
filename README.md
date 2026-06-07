@@ -25,6 +25,12 @@ cmake --build build
 ./build/redisc
 ```
 
+Run tests:
+
+```sh
+ctest --test-dir build --output-on-failure
+```
+
 The SSH tunnel mode requires the system `ssh` command to be available.
 
 ## Python Client Scripts
