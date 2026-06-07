@@ -120,16 +120,20 @@ QWidget *MainWindow::buildConnectionPanel()
     redisForm->addRow("Password", m_password);
     redisForm->addRow("Database", m_database);
 
-    auto *sshBox = new QGroupBox("SSH tunnel", panel);
-    auto *sshForm = new QFormLayout(sshBox);
-    m_useSsh = new QCheckBox("Use SSH tunnel", sshBox);
-    m_sshHost = new QLineEdit(sshBox);
-    m_sshPort = new QSpinBox(sshBox);
+    auto *sshBox = new QGroupBox("[+] SSH tunnel", panel);
+    sshBox->setCheckable(true);
+    sshBox->setChecked(false);
+    auto *sshBoxLayout = new QVBoxLayout(sshBox);
+    auto *sshBody = new QWidget(sshBox);
+    auto *sshForm = new QFormLayout(sshBody);
+    m_useSsh = new QCheckBox("Use SSH tunnel", sshBody);
+    m_sshHost = new QLineEdit(sshBody);
+    m_sshPort = new QSpinBox(sshBody);
     m_sshPort->setRange(1, 65535);
     m_sshPort->setValue(22);
-    m_sshUser = new QLineEdit(sshBox);
-    m_identityFile = new QLineEdit(sshBox);
-    auto *identityRow = new QWidget(sshBox);
+    m_sshUser = new QLineEdit(sshBody);
+    m_identityFile = new QLineEdit(sshBody);
+    auto *identityRow = new QWidget(sshBody);
     auto *identityLayout = new QHBoxLayout(identityRow);
     identityLayout->setContentsMargins(0, 0, 0, 0);
     auto *browseIdentity = new QToolButton(identityRow);
@@ -137,7 +141,7 @@ QWidget *MainWindow::buildConnectionPanel()
     browseIdentity->setToolTip("Choose identity file");
     identityLayout->addWidget(m_identityFile, 1);
     identityLayout->addWidget(browseIdentity);
-    m_localPort = new QSpinBox(sshBox);
+    m_localPort = new QSpinBox(sshBody);
     m_localPort->setRange(1, 65535);
     m_localPort->setValue(16379);
     sshForm->addRow(m_useSsh);
@@ -146,12 +150,18 @@ QWidget *MainWindow::buildConnectionPanel()
     sshForm->addRow("SSH user", m_sshUser);
     sshForm->addRow("Identity", identityRow);
     sshForm->addRow("Local port", m_localPort);
+    sshBoxLayout->addWidget(sshBody);
+    sshBody->setVisible(false);
 
-    auto *pythonBox = new QGroupBox("Python client", panel);
-    auto *pythonForm = new QFormLayout(pythonBox);
-    m_pythonEnabled = new QCheckBox("Notify Python on Redis messages", pythonBox);
-    m_pythonScript = new QLineEdit(pythonBox);
-    auto *scriptRow = new QWidget(pythonBox);
+    auto *pythonBox = new QGroupBox("[+] Python client", panel);
+    pythonBox->setCheckable(true);
+    pythonBox->setChecked(false);
+    auto *pythonBoxLayout = new QVBoxLayout(pythonBox);
+    auto *pythonBody = new QWidget(pythonBox);
+    auto *pythonForm = new QFormLayout(pythonBody);
+    m_pythonEnabled = new QCheckBox("Notify Python on Redis messages", pythonBody);
+    m_pythonScript = new QLineEdit(pythonBody);
+    auto *scriptRow = new QWidget(pythonBody);
     auto *scriptLayout = new QHBoxLayout(scriptRow);
     scriptLayout->setContentsMargins(0, 0, 0, 0);
     auto *browseScript = new QToolButton(scriptRow);
@@ -160,13 +170,15 @@ QWidget *MainWindow::buildConnectionPanel()
     scriptLayout->addWidget(m_pythonScript, 1);
     scriptLayout->addWidget(browseScript);
     auto *pythonButtons = new QHBoxLayout;
-    auto *loadScript = new QPushButton("Load", pythonBox);
-    auto *unloadScript = new QPushButton("Unload", pythonBox);
+    auto *loadScript = new QPushButton("Load", pythonBody);
+    auto *unloadScript = new QPushButton("Unload", pythonBody);
     pythonButtons->addWidget(loadScript);
     pythonButtons->addWidget(unloadScript);
     pythonForm->addRow(m_pythonEnabled);
     pythonForm->addRow("Script", scriptRow);
     pythonForm->addRow(pythonButtons);
+    pythonBoxLayout->addWidget(pythonBody);
+    pythonBody->setVisible(false);
 
     auto *buttons = new QHBoxLayout;
     auto *connectButton = new QPushButton("Connect", panel);
@@ -196,11 +208,19 @@ QWidget *MainWindow::buildConnectionPanel()
     connect(saveProfile, &QPushButton::clicked, this, &MainWindow::saveCurrentConnectionProfile);
     connect(deleteProfile, &QPushButton::clicked, this, &MainWindow::deleteCurrentConnectionProfile);
     connect(m_connectionList, &QListWidget::currentTextChanged, this, &MainWindow::loadConnectionProfile);
+    connect(sshBox, &QGroupBox::toggled, this, [sshBox, sshBody](bool expanded) {
+        sshBody->setVisible(expanded);
+        sshBox->setTitle(expanded ? "[-] SSH tunnel" : "[+] SSH tunnel");
+    });
     connect(browseIdentity, &QToolButton::clicked, this, [this]() {
         const QString file = QFileDialog::getOpenFileName(this, "Identity file");
         if (!file.isEmpty()) {
             m_identityFile->setText(file);
         }
+    });
+    connect(pythonBox, &QGroupBox::toggled, this, [pythonBox, pythonBody](bool expanded) {
+        pythonBody->setVisible(expanded);
+        pythonBox->setTitle(expanded ? "[-] Python client" : "[+] Python client");
     });
     connect(browseScript, &QToolButton::clicked, this, [this]() {
         const QString file = QFileDialog::getOpenFileName(this, "Python script", QString(), "Python files (*.py);;All files (*)");
@@ -404,8 +424,16 @@ void MainWindow::applyTheme(const QString &theme)
             QLineEdit, QSpinBox, QListWidget, QTextEdit, QMdiArea, QComboBox {
                 background: #2d2f33; border: 1px solid #5f6368; selection-background-color: #3c7dd9;
             }
-            QPushButton, QToolButton { background: #35373b; border: 1px solid #6b7078; padding: 6px 10px; }
-            QPushButton:hover, QToolButton:hover { background: #44474d; }
+            QPushButton, QToolButton {
+                background: #3f536b; color: #f6fbff; border: 1px solid #7890aa;
+                padding: 6px 10px; font-weight: 600;
+            }
+            QPushButton:hover, QToolButton:hover {
+                background: #4f6682; border-color: #9ab4d0;
+            }
+            QPushButton:pressed, QToolButton:pressed {
+                background: #32465c;
+            }
             QDockWidget::title { padding: 6px; }
         )";
     } else if (theme == "Dark Color") {
