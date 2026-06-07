@@ -17,6 +17,7 @@
 #include <QHBoxLayout>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QBrush>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -36,10 +37,12 @@
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
+    setObjectName("mainWindow");
     setWindowTitle("Redisc");
     resize(1180, 760);
 
     m_mdi = new QMdiArea(this);
+    m_mdi->setObjectName("mainWorkspace");
     setCentralWidget(m_mdi);
     connect(m_mdi, &QMdiArea::subWindowActivated, this, &MainWindow::updateChannelWindowTitles);
 
@@ -423,8 +426,17 @@ void MainWindow::setUiConnected(bool connected)
 
 void MainWindow::applyTheme(const QString &theme)
 {
-    const QString sheet = m_themeStyles.value(theme);
+    QString sheet = m_themeStyles.value(theme);
+    const QString mainWindowBackground = m_themeMainWindowBackgrounds.value(theme);
     qApp->setStyleSheet(sheet);
+    if (!mainWindowBackground.isEmpty()) {
+        const QColor color(mainWindowBackground);
+        if (color.isValid()) {
+            m_mdi->setBackground(QBrush(color));
+        }
+    } else {
+        m_mdi->setBackground(QBrush());
+    }
     updateChannelWindowTitles();
     saveSettings();
 }
@@ -777,6 +789,7 @@ void MainWindow::loadPythonScript()
 void MainWindow::loadThemes()
 {
     m_themeStyles.clear();
+    m_themeMainWindowBackgrounds.clear();
     m_theme->clear();
 
     for (const QString &directoryPath : themeDirectories()) {
@@ -801,11 +814,15 @@ void MainWindow::loadThemes()
             const QJsonObject object = document.object();
             const QString name = object.value("name").toString();
             const QString stylesheet = object.value("stylesheet").toString();
+            const QString mainWindowBackground = object.value("mainWindowBackground").toString();
             if (name.isEmpty() || m_themeStyles.contains(name)) {
                 continue;
             }
 
             m_themeStyles.insert(name, stylesheet);
+            if (!mainWindowBackground.isEmpty()) {
+                m_themeMainWindowBackgrounds.insert(name, mainWindowBackground);
+            }
             m_theme->addItem(name);
         }
     }

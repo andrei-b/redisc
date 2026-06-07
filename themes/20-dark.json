@@ -1,4 +1,5 @@
 {
   "name": "Dark",
-  "stylesheet": "QMainWindow, QWidget { background: #241315; color: #f1f3f4; }\nQLineEdit, QSpinBox, QListWidget, QTextEdit, QMdiArea, QComboBox { background: #321b1f; border: 1px solid #7d5157; selection-background-color: #9f3f4c; }\nQPushButton, QToolButton { background: #6b3f48; color: #f6fbff; border: 1px solid #a87880; padding: 6px 10px; font-weight: 600; }\nQPushButton:hover, QToolButton:hover { background: #80505a; border-color: #d19aa3; }\nQPushButton:pressed, QToolButton:pressed { background: #56323a; }\nQDockWidget::title { background: #321b1f; color: #ffd6db; padding: 6px; }\n"
+  "mainWindowBackground": "#241315",
+  "stylesheet": "QWidget { background: #241315; color: #f1f3f4; }\nQLineEdit, QSpinBox, QListWidget, QTextEdit, QComboBox { background: #321b1f; border: 1px solid #7d5157; selection-background-color: #9f3f4c; }\nQPushButton, QToolButton { background: #6b3f48; color: #f6fbff; border: 1px solid #a87880; padding: 6px 10px; font-weight: 600; }\nQPushButton:hover, QToolButton:hover { background: #80505a; border-color: #d19aa3; }\nQPushButton:pressed, QToolButton:pressed { background: #56323a; }\nQDockWidget::title { background: #321b1f; color: #ffd6db; padding: 6px; }\n"
 }

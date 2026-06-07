@@ -99,6 +99,7 @@ private:
     QFont m_channelFont;
     QColor m_channelTextColor = QColor("#202124");
     QHash<QString, QString> m_themeStyles;
+    QHash<QString, QString> m_themeMainWindowBackgrounds;
     QHash<QString, ChannelWindow *> m_windows;
     int m_jsonWindowCount = 0;
 };

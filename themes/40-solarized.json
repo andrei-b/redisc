@@ -1,4 +1,5 @@
 {
   "name": "Solarized",
-  "stylesheet": "QWidget { background: #fdf6e3; color: #073642; }\nQLineEdit, QSpinBox, QListWidget, QTextEdit, QMdiArea, QComboBox { background: #eee8d5; border: 1px solid #93a1a1; selection-background-color: #268bd2; }\nQPushButton, QToolButton { background: #eee8d5; border: 1px solid #839496; padding: 6px 10px; }\nQPushButton:hover, QToolButton:hover { background: #e1dbc7; }\n"
+  "mainWindowBackground": "#fdf6e3",
+  "stylesheet": "QWidget { background: #fdf6e3; color: #073642; }\nQLineEdit, QSpinBox, QListWidget, QTextEdit, QComboBox { background: #eee8d5; border: 1px solid #93a1a1; selection-background-color: #268bd2; }\nQPushButton, QToolButton { background: #eee8d5; border: 1px solid #839496; padding: 6px 10px; }\nQPushButton:hover, QToolButton:hover { background: #e1dbc7; }\n"
 }
