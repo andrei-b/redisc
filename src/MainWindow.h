@@ -66,6 +66,8 @@ private:
     void openJsonViewer(const QString &channel, const QString &jsonText);
     void loadPythonScript();
     void updateChannelWindowTitles();
+    void loadThemes();
+    QStringList themeDirectories() const;
 
     RedisConnection m_redis;
     SshTunnel m_tunnel;
@@ -96,6 +98,7 @@ private:
     QStringList m_recentChannels;
     QFont m_channelFont;
     QColor m_channelTextColor = QColor("#202124");
+    QHash<QString, QString> m_themeStyles;
     QHash<QString, ChannelWindow *> m_windows;
     int m_jsonWindowCount = 0;
 };

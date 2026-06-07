@@ -4,13 +4,19 @@
 #include <QCheckBox>
 #include <QColorDialog>
 #include <QComboBox>
+#include <QCoreApplication>
+#include <QDir>
 #include <QDockWidget>
+#include <QFile>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QFontDialog>
 #include <QFormLayout>
 #include <QFrame>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -187,7 +193,7 @@ QWidget *MainWindow::buildConnectionPanel()
     buttons->addWidget(disconnectButton);
 
     m_theme = new QComboBox(panel);
-    m_theme->addItems({"System", "Light", "Dark", "Dark Color", "Solarized"});
+    loadThemes();
 
     layout->addWidget(profilesBox);
     layout->addWidget(redisBox);
@@ -417,83 +423,7 @@ void MainWindow::setUiConnected(bool connected)
 
 void MainWindow::applyTheme(const QString &theme)
 {
-    QString sheet;
-    if (theme == "Dark") {
-        sheet = R"(
-            QWidget { background: #202124; color: #f1f3f4; }
-            QLineEdit, QSpinBox, QListWidget, QTextEdit, QMdiArea, QComboBox {
-                background: #2d2f33; border: 1px solid #5f6368; selection-background-color: #3c7dd9;
-            }
-            QPushButton, QToolButton {
-                background: #3f536b; color: #f6fbff; border: 1px solid #7890aa;
-                padding: 6px 10px; font-weight: 600;
-            }
-            QPushButton:hover, QToolButton:hover {
-                background: #4f6682; border-color: #9ab4d0;
-            }
-            QPushButton:pressed, QToolButton:pressed {
-                background: #32465c;
-            }
-            QDockWidget::title { padding: 6px; }
-        )";
-    } else if (theme == "Dark Color") {
-        sheet = R"(
-            QWidget { background: #17191f; color: #d7e6ff; }
-            QLabel { color: #8fd7ff; }
-            QGroupBox {
-                border: 1px solid #435063; border-radius: 5px; margin-top: 8px;
-                color: #f6c177; font-weight: 600;
-            }
-            QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; }
-            QLineEdit, QSpinBox, QListWidget, QTextEdit, QMdiArea, QComboBox, QTreeWidget {
-                background: #20242d; color: #e7f0ff; border: 1px solid #59677c;
-                selection-background-color: #2f80ed; selection-color: #ffffff;
-            }
-            QPushButton, QToolButton {
-                background: #252b36; color: #9cdcfe; border: 1px solid #667891;
-                padding: 6px 10px; font-weight: 600;
-            }
-            QPushButton:hover, QToolButton:hover {
-                background: #303849; color: #c3f4ff; border-color: #8fd7ff;
-            }
-            QCheckBox { color: #c3e88d; }
-            QDockWidget::title {
-                background: #20242d; color: #f6c177; padding: 6px; font-weight: 700;
-            }
-            QTabBar::tab {
-                background: #20242d; color: #9cdcfe; padding: 6px 10px;
-                border: 1px solid #435063;
-            }
-            QTabBar::tab:selected {
-                background: #2b3342; color: #f6c177; font-weight: 700;
-            }
-            QStatusBar { color: #c3e88d; }
-            QMdiSubWindow {
-                background: #20242d; color: #d7e6ff; border: 1px solid #59677c;
-            }
-            QMdiSubWindow:focus {
-                color: #f6c177; border: 2px solid #8fd7ff; font-weight: 800;
-            }
-        )";
-    } else if (theme == "Light") {
-        sheet = R"(
-            QWidget { background: #f7f8fa; color: #202124; }
-            QLineEdit, QSpinBox, QListWidget, QTextEdit, QMdiArea, QComboBox {
-                background: #ffffff; border: 1px solid #c7ccd4; selection-background-color: #2f80ed;
-            }
-            QPushButton, QToolButton { background: #ffffff; border: 1px solid #b8bec8; padding: 6px 10px; }
-            QPushButton:hover, QToolButton:hover { background: #eef2f7; }
-        )";
-    } else if (theme == "Solarized") {
-        sheet = R"(
-            QWidget { background: #fdf6e3; color: #073642; }
-            QLineEdit, QSpinBox, QListWidget, QTextEdit, QMdiArea, QComboBox {
-                background: #eee8d5; border: 1px solid #93a1a1; selection-background-color: #268bd2;
-            }
-            QPushButton, QToolButton { background: #eee8d5; border: 1px solid #839496; padding: 6px 10px; }
-            QPushButton:hover, QToolButton:hover { background: #e1dbc7; }
-        )";
-    }
+    const QString sheet = m_themeStyles.value(theme);
     qApp->setStyleSheet(sheet);
     updateChannelWindowTitles();
     saveSettings();
@@ -842,6 +772,60 @@ void MainWindow::loadPythonScript()
         m_pythonEnabled->setChecked(true);
         saveSettings();
     }
+}
+
+void MainWindow::loadThemes()
+{
+    m_themeStyles.clear();
+    m_theme->clear();
+
+    for (const QString &directoryPath : themeDirectories()) {
+        const QDir directory(directoryPath);
+        if (!directory.exists()) {
+            continue;
+        }
+
+        const QStringList files = directory.entryList({"*.json"}, QDir::Files, QDir::Name);
+        for (const QString &fileName : files) {
+            QFile file(directory.filePath(fileName));
+            if (!file.open(QIODevice::ReadOnly)) {
+                continue;
+            }
+
+            QJsonParseError error;
+            const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &error);
+            if (error.error != QJsonParseError::NoError || !document.isObject()) {
+                continue;
+            }
+
+            const QJsonObject object = document.object();
+            const QString name = object.value("name").toString();
+            const QString stylesheet = object.value("stylesheet").toString();
+            if (name.isEmpty() || m_themeStyles.contains(name)) {
+                continue;
+            }
+
+            m_themeStyles.insert(name, stylesheet);
+            m_theme->addItem(name);
+        }
+    }
+
+    if (m_themeStyles.isEmpty()) {
+        m_themeStyles.insert("System", QString());
+        m_theme->addItem("System");
+    }
+}
+
+QStringList MainWindow::themeDirectories() const
+{
+    const QString appDirectory = QCoreApplication::applicationDirPath();
+    QStringList directories;
+    directories << QDir(appDirectory).filePath("themes");
+    directories << QDir(QDir::currentPath()).filePath("themes");
+    directories << QFileInfo(QDir(appDirectory).filePath("../themes")).absoluteFilePath();
+    directories << QFileInfo(QDir(appDirectory).filePath("../../themes")).absoluteFilePath();
+    directories.removeDuplicates();
+    return directories;
 }
 
 void MainWindow::updateChannelWindowTitles()

@@ -1,0 +1,4 @@
+{
+  "name": "Light",
+  "stylesheet": "QWidget { background: #f7f8fa; color: #202124; }\nQLineEdit, QSpinBox, QListWidget, QTextEdit, QMdiArea, QComboBox { background: #ffffff; border: 1px solid #c7ccd4; selection-background-color: #2f80ed; }\nQPushButton, QToolButton { background: #ffffff; border: 1px solid #b8bec8; padding: 6px 10px; }\nQPushButton:hover, QToolButton:hover { background: #eef2f7; }\n"
+}
