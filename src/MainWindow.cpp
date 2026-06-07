@@ -76,7 +76,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(&m_tunnel, &SshTunnel::errorOccurred, this, [this](const QString &message) {
         QMessageBox::warning(this, "SSH tunnel error", message);
     });
-    connect(&m_python, &PythonClient::publishRequested, &m_redis, &RedisConnection::publish);
+    connect(&m_python, &PythonClient::publishRequested, this, &MainWindow::publishFromPython);
     connect(&m_python, &PythonClient::subscribeRequested, this, &MainWindow::openChannel);
     connect(&m_python, &PythonClient::unsubscribeRequested, &m_redis, &RedisConnection::unsubscribe);
     connect(&m_python, &PythonClient::logMessage, this, [this](const QString &message) {
@@ -89,6 +89,9 @@ MainWindow::MainWindow(QWidget *parent)
 
     loadSettings();
     applyTheme(m_theme->currentText());
+    if (m_pythonEnabled->isChecked() && !m_pythonScript->text().trimmed().isEmpty()) {
+        loadPythonScript();
+    }
 }
 
 QWidget *MainWindow::buildConnectionPanel()
@@ -390,7 +393,16 @@ void MainWindow::onMessage(const QString &channel, const QString &message)
     }
     m_windows.value(channel)->appendMessage(message);
     if (m_pythonEnabled->isChecked()) {
-        m_python.notifyRedisMessage(channel, message);
+        if (!m_python.isLoaded() && !m_pythonScript->text().trimmed().isEmpty()) {
+            loadPythonScript();
+        }
+        if (m_python.isLoaded()) {
+            m_pythonWarnedNotLoaded = false;
+            m_python.notifyRedisMessage(channel, message);
+        } else if (!m_pythonWarnedNotLoaded) {
+            m_pythonWarnedNotLoaded = true;
+            statusBar()->showMessage("Python notifications are enabled, but no script is loaded.");
+        }
     }
 }
 
@@ -782,8 +794,20 @@ void MainWindow::loadPythonScript()
 {
     if (m_python.loadScript(m_pythonScript->text())) {
         m_pythonEnabled->setChecked(true);
+        m_pythonWarnedNotLoaded = false;
         saveSettings();
     }
+}
+
+void MainWindow::publishFromPython(const QString &channel, const QString &message)
+{
+    const QString trimmed = channel.trimmed();
+    if (trimmed.isEmpty()) {
+        return;
+    }
+    rememberChannel(trimmed);
+    m_redis.publish(trimmed, message);
+    statusBar()->showMessage(QString("Python published to %1").arg(trimmed));
 }
 
 void MainWindow::loadThemes()

@@ -68,6 +68,7 @@ private:
     void updateChannelWindowTitles();
     void loadThemes();
     QStringList themeDirectories() const;
+    void publishFromPython(const QString &channel, const QString &message);
 
     RedisConnection m_redis;
     SshTunnel m_tunnel;
@@ -102,4 +103,5 @@ private:
     QHash<QString, QString> m_themeMainWindowBackgrounds;
     QHash<QString, ChannelWindow *> m_windows;
     int m_jsonWindowCount = 0;
+    bool m_pythonWarnedNotLoaded = false;
 };
