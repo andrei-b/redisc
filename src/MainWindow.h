@@ -65,6 +65,7 @@ private:
     void updateChannelAppearanceControls();
     void openJsonViewer(const QString &channel, const QString &jsonText);
     void loadPythonScript();
+    void updateChannelWindowTitles();
 
     RedisConnection m_redis;
     SshTunnel m_tunnel;

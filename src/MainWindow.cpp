@@ -35,6 +35,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     m_mdi = new QMdiArea(this);
     setCentralWidget(m_mdi);
+    connect(m_mdi, &QMdiArea::subWindowActivated, this, &MainWindow::updateChannelWindowTitles);
 
     auto *dock = new QDockWidget("Connection", this);
     dock->setObjectName("connectionDock");
@@ -174,7 +175,7 @@ QWidget *MainWindow::buildConnectionPanel()
     buttons->addWidget(disconnectButton);
 
     m_theme = new QComboBox(panel);
-    m_theme->addItems({"System", "Light", "Dark", "Solarized"});
+    m_theme->addItems({"System", "Light", "Dark", "Dark Color", "Solarized"});
 
     layout->addWidget(profilesBox);
     layout->addWidget(redisBox);
@@ -331,15 +332,18 @@ void MainWindow::onSubscribed(const QString &channel)
     window->setMessageAppearance(m_channelFont, m_channelTextColor);
     auto *subWindow = m_mdi->addSubWindow(window);
     subWindow->setWindowTitle(channel);
+    subWindow->setProperty("channelName", channel);
     subWindow->resize(520, 360);
     window->show();
     m_windows.insert(channel, window);
+    updateChannelWindowTitles();
 
     connect(window, &ChannelWindow::publishRequested, &m_redis, &RedisConnection::publish);
     connect(window, &ChannelWindow::unsubscribeRequested, &m_redis, &RedisConnection::unsubscribe);
     connect(window, &ChannelWindow::jsonViewRequested, this, &MainWindow::openJsonViewer);
     connect(subWindow, &QMdiSubWindow::destroyed, this, [this, channel]() {
         m_windows.remove(channel);
+        updateChannelWindowTitles();
     });
 }
 
@@ -404,6 +408,45 @@ void MainWindow::applyTheme(const QString &theme)
             QPushButton:hover, QToolButton:hover { background: #44474d; }
             QDockWidget::title { padding: 6px; }
         )";
+    } else if (theme == "Dark Color") {
+        sheet = R"(
+            QWidget { background: #17191f; color: #d7e6ff; }
+            QLabel { color: #8fd7ff; }
+            QGroupBox {
+                border: 1px solid #435063; border-radius: 5px; margin-top: 8px;
+                color: #f6c177; font-weight: 600;
+            }
+            QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; }
+            QLineEdit, QSpinBox, QListWidget, QTextEdit, QMdiArea, QComboBox, QTreeWidget {
+                background: #20242d; color: #e7f0ff; border: 1px solid #59677c;
+                selection-background-color: #2f80ed; selection-color: #ffffff;
+            }
+            QPushButton, QToolButton {
+                background: #252b36; color: #9cdcfe; border: 1px solid #667891;
+                padding: 6px 10px; font-weight: 600;
+            }
+            QPushButton:hover, QToolButton:hover {
+                background: #303849; color: #c3f4ff; border-color: #8fd7ff;
+            }
+            QCheckBox { color: #c3e88d; }
+            QDockWidget::title {
+                background: #20242d; color: #f6c177; padding: 6px; font-weight: 700;
+            }
+            QTabBar::tab {
+                background: #20242d; color: #9cdcfe; padding: 6px 10px;
+                border: 1px solid #435063;
+            }
+            QTabBar::tab:selected {
+                background: #2b3342; color: #f6c177; font-weight: 700;
+            }
+            QStatusBar { color: #c3e88d; }
+            QMdiSubWindow {
+                background: #20242d; color: #d7e6ff; border: 1px solid #59677c;
+            }
+            QMdiSubWindow:focus {
+                color: #f6c177; border: 2px solid #8fd7ff; font-weight: 800;
+            }
+        )";
     } else if (theme == "Light") {
         sheet = R"(
             QWidget { background: #f7f8fa; color: #202124; }
@@ -424,6 +467,7 @@ void MainWindow::applyTheme(const QString &theme)
         )";
     }
     qApp->setStyleSheet(sheet);
+    updateChannelWindowTitles();
     saveSettings();
 }
 
@@ -769,5 +813,46 @@ void MainWindow::loadPythonScript()
     if (m_python.loadScript(m_pythonScript->text())) {
         m_pythonEnabled->setChecked(true);
         saveSettings();
+    }
+}
+
+void MainWindow::updateChannelWindowTitles()
+{
+    if (!m_mdi) {
+        return;
+    }
+
+    QMdiSubWindow *active = m_mdi->activeSubWindow();
+    for (ChannelWindow *window : std::as_const(m_windows)) {
+        auto *subWindow = qobject_cast<QMdiSubWindow *>(window->parentWidget());
+        if (!subWindow) {
+            continue;
+        }
+
+        const QString channel = subWindow->property("channelName").toString();
+        const bool isActive = subWindow == active;
+        QFont titleFont = subWindow->font();
+        titleFont.setPointSize(isActive ? 11 : 9);
+        titleFont.setBold(isActive);
+        subWindow->setFont(titleFont);
+        subWindow->setWindowTitle(isActive ? QString("%1  [active]").arg(channel) : channel);
+
+        if (isActive) {
+            subWindow->setStyleSheet(R"(
+                QMdiSubWindow {
+                    color: #f6c177;
+                    border: 2px solid #8fd7ff;
+                    font-weight: 800;
+                }
+            )");
+        } else {
+            subWindow->setStyleSheet(R"(
+                QMdiSubWindow {
+                    color: #d7e6ff;
+                    border: 1px solid #59677c;
+                    font-weight: 500;
+                }
+            )");
+        }
     }
 }

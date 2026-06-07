@@ -13,7 +13,8 @@ Redisc is a small Qt 6 Redis pub/sub client.
 - Configurable persistent font and text color for channel windows.
 - Python client scripts via QtPyT, with Redis message callbacks and publish/subscribe API.
 - Publish messages from each channel window.
-- System, light, dark, and solarized color schemes.
+- System, light, dark, dark color, and solarized color schemes.
+- Active channel windows use a stronger title font and accent styling.
 - Manageable named connection profiles with saved Redis fields, SSH tunnel fields, window geometry, and selected color scheme.
 
 ## Build
