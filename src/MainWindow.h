@@ -3,6 +3,7 @@
 #include "ChannelWindow.h"
 #include "JsonTreeWindow.h"
 #include "PythonClient.h"
+#include "PythonEditorWindow.h"
 #include "RedisConnection.h"
 #include "SshTunnel.h"
 
@@ -69,6 +70,7 @@ private:
     void loadThemes();
     QStringList themeDirectories() const;
     void publishFromPython(const QString &channel, const QString &message);
+    void openPythonEditor();
 
     RedisConnection m_redis;
     SshTunnel m_tunnel;

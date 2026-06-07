@@ -12,6 +12,7 @@ Redisc is a small Qt 6 Redis pub/sub client.
 - JSON messages can be copied into separate collapsible tree windows.
 - Configurable persistent font and text color for channel windows.
 - Python client scripts via QtPyT, with Redis message callbacks and publish/subscribe API.
+- Built-in Python script editor with syntax highlighting.
 - Publish messages from each channel window.
 - System, light, dark, dark color, and solarized color schemes.
 - Themes are loaded from editable JSON files in `themes/`.

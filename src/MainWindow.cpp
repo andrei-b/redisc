@@ -183,8 +183,10 @@ QWidget *MainWindow::buildConnectionPanel()
     scriptLayout->addWidget(browseScript);
     auto *pythonButtons = new QHBoxLayout;
     auto *loadScript = new QPushButton("Load", pythonBody);
+    auto *editScript = new QPushButton("Edit", pythonBody);
     auto *unloadScript = new QPushButton("Unload", pythonBody);
     pythonButtons->addWidget(loadScript);
+    pythonButtons->addWidget(editScript);
     pythonButtons->addWidget(unloadScript);
     pythonForm->addRow(m_pythonEnabled);
     pythonForm->addRow("Script", scriptRow);
@@ -241,6 +243,7 @@ QWidget *MainWindow::buildConnectionPanel()
         }
     });
     connect(loadScript, &QPushButton::clicked, this, &MainWindow::loadPythonScript);
+    connect(editScript, &QPushButton::clicked, this, &MainWindow::openPythonEditor);
     connect(unloadScript, &QPushButton::clicked, this, [this]() {
         m_python.clear();
         statusBar()->showMessage("Unloaded Python script");
@@ -808,6 +811,31 @@ void MainWindow::publishFromPython(const QString &channel, const QString &messag
     rememberChannel(trimmed);
     m_redis.publish(trimmed, message);
     statusBar()->showMessage(QString("Python published to %1").arg(trimmed));
+}
+
+void MainWindow::openPythonEditor()
+{
+    QString path = m_pythonScript->text().trimmed();
+    if (path.isEmpty()) {
+        path = QFileDialog::getOpenFileName(this, "Python script", QString(), "Python files (*.py);;All files (*)");
+        if (path.isEmpty()) {
+            return;
+        }
+        m_pythonScript->setText(path);
+    }
+
+    auto *editor = new PythonEditorWindow(path);
+    auto *subWindow = m_mdi->addSubWindow(editor);
+    subWindow->setWindowTitle(QString("Edit %1").arg(QFileInfo(path).fileName()));
+    subWindow->resize(760, 560);
+    editor->show();
+    m_mdi->setActiveSubWindow(subWindow);
+
+    connect(editor, &PythonEditorWindow::saved, this, [this](const QString &savedPath) {
+        m_pythonScript->setText(savedPath);
+        loadPythonScript();
+        statusBar()->showMessage(QString("Saved and loaded %1").arg(savedPath));
+    });
 }
 
 void MainWindow::loadThemes()

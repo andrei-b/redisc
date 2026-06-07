@@ -1,0 +1,7 @@
+<RCC>
+    <qresource prefix="/icons">
+        <file>icons/redisc.png</file>
+        <file>icons/redisc32x32.png</file>
+        <file>icons/redisc64x64.png</file>
+    </qresource>
+</RCC>

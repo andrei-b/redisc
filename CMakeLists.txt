@@ -35,6 +35,10 @@ qt_add_executable(redisc
     src/MainWindow.h
     src/PythonClient.cpp
     src/PythonClient.h
+    src/PythonEditorWindow.cpp
+    src/PythonEditorWindow.h
+    src/PythonHighlighter.cpp
+    src/PythonHighlighter.h
     src/RedisConnection.cpp
     src/RedisConnection.h
     src/SshTunnel.cpp
