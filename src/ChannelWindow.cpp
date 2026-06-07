@@ -66,7 +66,7 @@ QString ChannelWindow::channel() const
 
 void ChannelWindow::appendMessage(const QString &message)
 {
-    const QString time = QDateTime::currentDateTime().toString("HH:mm:ss");
+    const QString time = QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss");
     m_messages->moveCursor(QTextCursor::End);
     m_messages->insertPlainText(QString("[%1] %2\n").arg(time, message));
     m_messages->moveCursor(QTextCursor::End);

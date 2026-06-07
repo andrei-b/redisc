@@ -3,9 +3,9 @@ def on_loaded():
 
 
 def on_redis_message(channel, message):
-    log(f"{channel}: {message}")
-    publish(f"{channel}.processed", message)
-    print("sent")
+    if not channel.endswith(".processed"):
+        publish(f"{channel}.processed", message)
+   
 
 
 # Available API from Redisc:
