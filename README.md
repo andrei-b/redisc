@@ -14,6 +14,7 @@ Redisc is a small Qt 6 Redis pub/sub client.
 - Python client scripts via QtPyT, with Redis message callbacks and publish/subscribe API.
 - Publish messages from each channel window.
 - System, light, dark, dark color, and solarized color schemes.
+- Themes are loaded from editable JSON files in `themes/`.
 - Active channel windows use a stronger title font and accent styling.
 - Manageable named connection profiles with saved Redis fields, SSH tunnel fields, window geometry, and selected color scheme.
 
@@ -32,6 +33,12 @@ ctest --test-dir build --output-on-failure
 ```
 
 The SSH tunnel mode requires the system `ssh` command to be available.
+
+## Themes
+
+Theme files live in `themes/` and are copied next to the executable during the
+build. Each file is JSON with a display `name`, optional
+`mainWindowBackground`, and Qt `stylesheet` string.
 
 ## Python Client Scripts
 

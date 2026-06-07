@@ -40,10 +40,17 @@ qt_add_executable(redisc
     src/SshTunnel.cpp
     src/SshTunnel.h
     src/main.cpp
+    resources.qrc
 )
 
 target_include_directories(redisc PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/qtpyt/include")
 target_link_libraries(redisc PRIVATE Qt6::Widgets Qt6::Network qtpyt)
+
+add_custom_command(TARGET redisc POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/themes"
+        "$<TARGET_FILE_DIR:redisc>/themes"
+)
 
 enable_testing()
 
