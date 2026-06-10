@@ -16,6 +16,7 @@
 class QCheckBox;
 class QCloseEvent;
 class QComboBox;
+class QGroupBox;
 class QLabel;
 class QLineEdit;
 class QListWidget;
@@ -89,7 +90,7 @@ private:
     QLineEdit *m_username = nullptr;
     QLineEdit *m_password = nullptr;
     QSpinBox *m_database = nullptr;
-    QCheckBox *m_useSsh = nullptr;
+    QGroupBox *m_sshBox = nullptr;
     QLineEdit *m_sshHost = nullptr;
     QSpinBox *m_sshPort = nullptr;
     QLineEdit *m_sshUser = nullptr;

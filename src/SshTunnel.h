@@ -2,6 +2,8 @@
 
 #include <QObject>
 #include <QProcess>
+#include <QTcpSocket>
+#include <QTimer>
 
 struct SshTunnelConfig {
     bool enabled = false;
@@ -34,7 +36,13 @@ private slots:
     void onStarted();
     void onError(QProcess::ProcessError error);
     void onFinished(int exitCode, QProcess::ExitStatus status);
+    void probe();
 
 private:
     QProcess m_process;
+    QTimer m_probeTimer;
+    QTcpSocket m_probeSocket;
+    quint16 m_localPort = 0;
+    int m_probeAttempts = 0;
+    static constexpr int k_maxProbeAttempts = 100; // 10 s total
 };

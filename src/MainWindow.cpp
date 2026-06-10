@@ -71,9 +71,16 @@ MainWindow::MainWindow(QWidget *parent)
     connect(&m_redis, &RedisConnection::messageReceived, this, &MainWindow::onMessage);
 
     connect(&m_tunnel, &SshTunnel::ready, this, [this]() {
+        statusBar()->showMessage("SSH tunnel ready, connecting to Redis...");
         m_redis.connectToRedis(redisConfig());
     });
+    connect(&m_tunnel, &SshTunnel::stopped, this, [this]() {
+        if (!m_redis.isConnected()) {
+            statusBar()->showMessage("SSH tunnel stopped.");
+        }
+    });
     connect(&m_tunnel, &SshTunnel::errorOccurred, this, [this](const QString &message) {
+        statusBar()->showMessage("SSH error: " + message);
         QMessageBox::warning(this, "SSH tunnel error", message);
     });
     connect(&m_python, &PythonClient::publishRequested, this, &MainWindow::publishFromPython);
@@ -132,13 +139,12 @@ QWidget *MainWindow::buildConnectionPanel()
     redisForm->addRow("Password", m_password);
     redisForm->addRow("Database", m_database);
 
-    auto *sshBox = new QGroupBox("[+] SSH tunnel", panel);
-    sshBox->setCheckable(true);
-    sshBox->setChecked(false);
-    auto *sshBoxLayout = new QVBoxLayout(sshBox);
-    auto *sshBody = new QWidget(sshBox);
+    m_sshBox = new QGroupBox("SSH tunnel", panel);
+    m_sshBox->setCheckable(true);
+    m_sshBox->setChecked(false);
+    auto *sshBoxLayout = new QVBoxLayout(m_sshBox);
+    auto *sshBody = new QWidget(m_sshBox);
     auto *sshForm = new QFormLayout(sshBody);
-    m_useSsh = new QCheckBox("Use SSH tunnel", sshBody);
     m_sshHost = new QLineEdit(sshBody);
     m_sshPort = new QSpinBox(sshBody);
     m_sshPort->setRange(1, 65535);
@@ -156,7 +162,6 @@ QWidget *MainWindow::buildConnectionPanel()
     m_localPort = new QSpinBox(sshBody);
     m_localPort->setRange(1, 65535);
     m_localPort->setValue(16379);
-    sshForm->addRow(m_useSsh);
     sshForm->addRow("SSH host", m_sshHost);
     sshForm->addRow("SSH port", m_sshPort);
     sshForm->addRow("SSH user", m_sshUser);
@@ -205,7 +210,7 @@ QWidget *MainWindow::buildConnectionPanel()
 
     layout->addWidget(profilesBox);
     layout->addWidget(redisBox);
-    layout->addWidget(sshBox);
+    layout->addWidget(m_sshBox);
     layout->addWidget(pythonBox);
     layout->addLayout(buttons);
     layout->addWidget(new QLabel("Color scheme", panel));
@@ -222,10 +227,16 @@ QWidget *MainWindow::buildConnectionPanel()
     connect(saveProfile, &QPushButton::clicked, this, &MainWindow::saveCurrentConnectionProfile);
     connect(deleteProfile, &QPushButton::clicked, this, &MainWindow::deleteCurrentConnectionProfile);
     connect(m_connectionList, &QListWidget::currentTextChanged, this, &MainWindow::loadConnectionProfile);
-    connect(sshBox, &QGroupBox::toggled, this, [sshBox, sshBody](bool expanded) {
-        sshBody->setVisible(expanded);
-        sshBox->setTitle(expanded ? "[-] SSH tunnel" : "[+] SSH tunnel");
-    });
+    auto updateSshFields = [this, sshBody](bool enabled) {
+        sshBody->setVisible(enabled);
+        m_sshHost->setEnabled(enabled);
+        m_sshPort->setEnabled(enabled);
+        m_sshUser->setEnabled(enabled);
+        m_identityFile->setEnabled(enabled);
+        m_localPort->setEnabled(enabled);
+    };
+    updateSshFields(false);
+    connect(m_sshBox, &QGroupBox::toggled, this, updateSshFields);
     connect(browseIdentity, &QToolButton::clicked, this, [this]() {
         const QString file = QFileDialog::getOpenFileName(this, "Identity file");
         if (!file.isEmpty()) {
@@ -305,11 +316,12 @@ QWidget *MainWindow::buildChannelPanel()
 
 void MainWindow::connectClicked()
 {
+    const bool useSsh = m_sshBox->isChecked();
     if (m_host->text().trimmed().isEmpty()) {
         QMessageBox::warning(this, "Missing Redis host", "Enter a Redis host before connecting.");
         return;
     }
-    if (m_useSsh->isChecked() && m_sshHost->text().trimmed().isEmpty()) {
+    if (useSsh && m_sshHost->text().trimmed().isEmpty()) {
         QMessageBox::warning(this, "Missing SSH host", "Enter an SSH host before connecting over a tunnel.");
         return;
     }
@@ -317,10 +329,11 @@ void MainWindow::connectClicked()
         saveCurrentConnectionProfile();
     }
     saveSettings();
-    statusBar()->showMessage("Connecting...");
-    if (m_useSsh->isChecked()) {
+    if (useSsh) {
+        statusBar()->showMessage("Starting SSH tunnel...");
         m_tunnel.start(tunnelConfig());
     } else {
+        statusBar()->showMessage("Connecting...");
         m_redis.connectToRedis(redisConfig());
     }
 }
@@ -411,9 +424,10 @@ void MainWindow::onMessage(const QString &channel, const QString &message)
 
 RedisConfig MainWindow::redisConfig() const
 {
+    const bool useSsh = m_sshBox->isChecked();
     RedisConfig config;
-    config.host = m_useSsh->isChecked() ? "127.0.0.1" : m_host->text().trimmed();
-    config.port = static_cast<quint16>(m_useSsh->isChecked() ? m_localPort->value() : m_port->value());
+    config.host = useSsh ? "127.0.0.1" : m_host->text().trimmed();
+    config.port = static_cast<quint16>(useSsh ? m_localPort->value() : m_port->value());
     config.username = m_username->text().trimmed();
     config.password = m_password->text();
     config.database = m_database->value();
@@ -423,7 +437,7 @@ RedisConfig MainWindow::redisConfig() const
 SshTunnelConfig MainWindow::tunnelConfig() const
 {
     SshTunnelConfig config;
-    config.enabled = m_useSsh->isChecked();
+    config.enabled = m_sshBox->isChecked();
     config.sshHost = m_sshHost->text().trimmed();
     config.sshPort = static_cast<quint16>(m_sshPort->value());
     config.sshUser = m_sshUser->text().trimmed();
@@ -580,7 +594,7 @@ void MainWindow::loadConnectionProfile(const QString &name)
     m_username->setText(settings.value("redisUsername").toString());
     m_password->setText(settings.value("redisPassword").toString());
     m_database->setValue(settings.value("redisDatabase", 0).toInt());
-    m_useSsh->setChecked(settings.value("sshEnabled", false).toBool());
+    m_sshBox->setChecked(settings.value("sshEnabled", false).toBool());
     m_sshHost->setText(settings.value("sshHost").toString());
     m_sshPort->setValue(settings.value("sshPort", 22).toInt());
     m_sshUser->setText(settings.value("sshUser").toString());
@@ -623,7 +637,7 @@ void MainWindow::saveCurrentConnectionProfile()
     settings.setValue("redisUsername", m_username->text().trimmed());
     settings.setValue("redisPassword", m_password->text());
     settings.setValue("redisDatabase", m_database->value());
-    settings.setValue("sshEnabled", m_useSsh->isChecked());
+    settings.setValue("sshEnabled", m_sshBox->isChecked());
     settings.setValue("sshHost", m_sshHost->text().trimmed());
     settings.setValue("sshPort", m_sshPort->value());
     settings.setValue("sshUser", m_sshUser->text().trimmed());
@@ -681,7 +695,7 @@ void MainWindow::resetConnectionFields()
     m_username->clear();
     m_password->clear();
     m_database->setValue(0);
-    m_useSsh->setChecked(false);
+    m_sshBox->setChecked(false);
     m_sshHost->clear();
     m_sshPort->setValue(22);
     m_sshUser->clear();
